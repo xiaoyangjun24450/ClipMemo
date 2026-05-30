@@ -35,15 +35,14 @@ function saveHistory(history) {
 /**
  * 添加新剪贴内容
  * @param {string} content - 剪贴内容
- * @param {string} type - 内容类型: text/image
+ * @param {object} extra - 扩展字段 { rawType, rawTypeLabel, aiType, tags, summary, copyCount, ... }
  */
-function addClip(content, type = 'text') {
+function addClip(content, extra = {}) {
 	const history = getHistory()
 	const now = Date.now()
 	
 	// 检查是否重复（与最近一条比较）
 	if (history.length > 0 && history[0].content === content) {
-		// 更新最新一条的时间戳
 		history[0].time = now
 		saveHistory(history)
 		return history[0]
@@ -53,9 +52,18 @@ function addClip(content, type = 'text') {
 	const newClip = {
 		id: now.toString(),
 		content: content,
-		type: type,
 		time: now,
-		collected: true  // 标记为已收录
+		rawType: extra.rawType || 'text',
+		rawTypeLabel: extra.rawTypeLabel || '文本',
+		aiType: extra.aiType || '',
+		aiTypeLabel: extra.aiTypeLabel || '',
+		tags: extra.tags || [],
+		summary: extra.summary || '',
+		typeIcon: extra.typeIcon || '💬',
+		typeColor: extra.typeColor || '#95A5A6',
+		copyCount: extra.copyCount || 0,
+		lastCopyTime: 0,
+		collected: true,
 	}
 	
 	// 添加到列表开头
@@ -94,7 +102,7 @@ function clearHistory() {
 }
 
 /**
- * 搜索剪贴内容
+ * 搜索剪贴内容（支持内容+标签模糊匹配）
  * @param {string} keyword - 搜索关键词
  */
 function searchClips(keyword) {
@@ -104,9 +112,13 @@ function searchClips(keyword) {
 	const lowerKeyword = keyword.toLowerCase()
 	
 	return history.filter(item => {
-		if (item.type === 'text') {
-			return item.content.toLowerCase().includes(lowerKeyword)
-		}
+		// 匹配内容
+		if (item.content && item.content.toLowerCase().includes(lowerKeyword)) return true
+		// 匹配标签
+		if (item.tags && item.tags.some(tag => tag.toLowerCase().includes(lowerKeyword))) return true
+		// 匹配类型标签
+		if (item.aiTypeLabel && item.aiTypeLabel.toLowerCase().includes(lowerKeyword)) return true
+		if (item.rawTypeLabel && item.rawTypeLabel.toLowerCase().includes(lowerKeyword)) return true
 		return false
 	})
 }
@@ -128,6 +140,7 @@ function getCollectedCount() {
 
 export default {
 	getHistory,
+	saveHistory,
 	addClip,
 	deleteClip,
 	clearHistory,
