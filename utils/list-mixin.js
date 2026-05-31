@@ -14,12 +14,15 @@ import clipboard from '@/utils/clipboard.js'
 import recognizer from '@/utils/recognizer.js'
 import timeUtil from '@/utils/time.js'
 import searchUtil from '@/utils/search.js'
+import sortUtil from '@/utils/sort.js'
 
 export const listMixin = {
   data() {
     return {
       searchKeyword: '',
       searchFocused: false,
+      sortMode: '',
+      sortVisible: false,
       pendingContent: null,
       pendingRaw: null,
       notifyShow: false,
@@ -51,6 +54,17 @@ export const listMixin = {
         color: config[k].color,
       }))
     },
+
+    sortLabel() {
+      return sortUtil.SORT_MODES[this.sortMode] ? sortUtil.SORT_MODES[this.sortMode].label : '排序'
+    },
+
+    sortOptions() {
+      return Object.keys(sortUtil.SORT_MODES).map(k => ({
+        value: k,
+        label: sortUtil.SORT_MODES[k].label,
+      }))
+    },
   },
 
   onShow() {
@@ -69,10 +83,31 @@ export const listMixin = {
     // ==================== 数据加载 ====================
     loadList() {
       const raw = storage.getHistory()
-      this.clipList = raw.map(item => ({
+      const sorted = this.sortMode ? sortUtil.sort(this.sortMode, raw) : raw
+      this.clipList = sorted.map(item => ({
         ...item,
         ...this._getTypeDisplay(item),
       }))
+    },
+
+    applySort() {
+      if (!this.sortMode) return
+      const raw = this.clipList
+      const sorted = sortUtil.sort(this.sortMode, raw)
+      this.clipList = sorted.map(item => ({
+        ...item,
+        ...this._getTypeDisplay(item),
+      }))
+    },
+
+    toggleSort() {
+      this.sortVisible = !this.sortVisible
+    },
+
+    selectSort(mode) {
+      this.sortMode = mode
+      this.sortVisible = false
+      this.loadList()
     },
 
     // ==================== 格式化 ====================

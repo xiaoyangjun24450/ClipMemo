@@ -15,6 +15,25 @@
         />
         <text v-if="searchKeyword" class="search-clear" @click="clearSearch">✕</text>
       </view>
+      <view class="sort-btn" @click="toggleSort">
+        <text class="sort-icon">⇅</text>
+        <text class="sort-label">{{ sortLabel }}</text>
+      </view>
+    </view>
+
+    <!-- 排序下拉 -->
+    <view v-if="sortVisible" class="sort-mask" @click="toggleSort">
+      <view class="sort-dropdown" @click.stop>
+        <view
+          v-for="opt in sortOptions"
+          :key="opt.value"
+          class="sort-option"
+          :class="{ active: sortMode === opt.value }"
+          @click="selectSort(opt.value)"
+        >
+          <text>{{ opt.label }}</text>
+        </view>
+      </view>
     </view>
 
     <!-- 新内容通知条 -->
@@ -224,6 +243,57 @@ export default {
   font-size: 28rpx;
   color: #999;
   padding: 8rpx;
+}
+.sort-btn {
+  display: flex;
+  align-items: center;
+  margin-left: 16rpx;
+  padding: 8rpx 16rpx;
+  border-radius: 24rpx;
+  background: #F5F5F5;
+  white-space: nowrap;
+}
+.sort-icon {
+  font-size: 24rpx;
+  margin-right: 4rpx;
+}
+.sort-label {
+  font-size: 24rpx;
+  color: #666;
+}
+
+/* ========== 排序下拉 ========== */
+.sort-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 300;
+  background: transparent;
+}
+.sort-dropdown {
+  position: absolute;
+  top: 90rpx;
+  right: 24rpx;
+  background: #FFF;
+  border-radius: 12rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.12);
+  overflow: hidden;
+}
+.sort-option {
+  padding: 22rpx 36rpx;
+  font-size: 28rpx;
+  color: #333;
+  white-space: nowrap;
+  border-bottom: 1rpx solid #F0F0F0;
+}
+.sort-option:last-child {
+  border-bottom: none;
+}
+.sort-option.active {
+  color: #3498DB;
+  background: #E8F4FD;
 }
 /* ========== 通知条 ========== */
 .notify-bar {
