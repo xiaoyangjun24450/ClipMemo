@@ -6,7 +6,7 @@ import storage from './utils/storage.js'
 export default {
 	onLaunch: function() {
 		console.log('App Launch')
-		this.initServices()
+		// this.initServices()  // 通知事件暂时关闭
 	},
 	onShow: function() {
 		console.log('App Show')

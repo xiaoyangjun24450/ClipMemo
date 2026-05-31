@@ -41,9 +41,15 @@ function addClip(content, extra = {}) {
 	const history = getHistory()
 	const now = Date.now()
 	
-	// 检查是否重复（与最近一条比较）
-	if (history.length > 0 && history[0].content === content) {
-		history[0].time = now
+	// 检查是否重复（全量比较）
+	const dupIndex = history.findIndex(item => item.content === content)
+	if (dupIndex > -1) {
+		// 已存在：更新时间，移到列表开头
+		history[dupIndex].time = now
+		if (dupIndex > 0) {
+			const [dup] = history.splice(dupIndex, 1)
+			history.unshift(dup)
+		}
 		saveHistory(history)
 		return history[0]
 	}

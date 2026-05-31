@@ -19,6 +19,7 @@ import sortUtil from '@/utils/sort.js'
 export const listMixin = {
   data() {
     return {
+      activeTab: 'home',
       searchKeyword: '',
       searchFocused: false,
       sortMode: '',
@@ -297,6 +298,16 @@ export const listMixin = {
     addToKnowledgeGraph() {
       // TODO: 接入后端 api.addToKnowledgeGraph
       uni.showToast({ title: '知识图谱功能开发中', icon: 'none', duration: 1500 })
+    },
+
+    // ==================== 底部导航 ====================
+    switchTab(tab) {
+      this.activeTab = tab
+      if (tab === 'knowledge') {
+        uni.showToast({ title: '知识图谱开发中', icon: 'none', duration: 1500 })
+      } else if (tab === 'settings') {
+        uni.showToast({ title: '设置页开发中', icon: 'none', duration: 1500 })
+      }
     },
 
     // ==================== 分页 ====================

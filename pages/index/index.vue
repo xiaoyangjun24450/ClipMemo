@@ -188,6 +188,22 @@
         </view>
       </view>
     </view>
+
+    <!-- 底部导航栏 -->
+    <view class="tab-bar">
+      <view class="tab-item" :class="{ active: activeTab === 'home' }" @click="switchTab('home')">
+        <text class="tab-icon">🏠</text>
+        <text class="tab-text">主页</text>
+      </view>
+      <view class="tab-item" :class="{ active: activeTab === 'knowledge' }" @click="switchTab('knowledge')">
+        <text class="tab-icon">🧠</text>
+        <text class="tab-text">知识图谱</text>
+      </view>
+      <view class="tab-item" :class="{ active: activeTab === 'settings' }" @click="switchTab('settings')">
+        <text class="tab-icon">⚙️</text>
+        <text class="tab-text">设置</text>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -582,5 +598,34 @@ export default {
 }
 .detail-actions {
   padding: 8rpx 24rpx 24rpx;
+}
+
+/* ========== 底部导航栏 ========== */
+.tab-bar {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  background: #FFF;
+  border-top: 1rpx solid #F0F0F0;
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-top: 12rpx;
+}
+.tab-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8rpx 0;
+}
+.tab-icon {
+  font-size: 36rpx;
+  margin-bottom: 4rpx;
+}
+.tab-text {
+  font-size: 22rpx;
+  color: #999;
+}
+.tab-item.active .tab-text {
+  color: #3498DB;
+  font-weight: 500;
 }
 </style>
