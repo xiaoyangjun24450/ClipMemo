@@ -138,6 +138,21 @@ function getCollectedCount() {
 	return getHistory().filter(item => item.collected).length
 }
 
+/**
+ * 记录该记录的复制次数
+ * @param {string} id - 记录ID
+ * @returns {number} - 当前复制次数，-1 表示未找到
+ */
+function recordCopyCount(id) {
+	const history = getHistory()
+	const target = history.find(item => item.id === id)
+	if (!target) return -1
+	target.copyCount = (target.copyCount || 0) + 1
+	target.lastCopyTime = Date.now()
+	saveHistory(history)
+	return target.copyCount
+}
+
 export default {
 	getHistory,
 	saveHistory,
@@ -146,5 +161,6 @@ export default {
 	clearHistory,
 	searchClips,
 	getLatestClip,
-	getCollectedCount
+	getCollectedCount,
+	recordCopyCount
 }
