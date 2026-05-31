@@ -306,7 +306,7 @@ export const listMixin = {
       if (tab === 'knowledge') {
         uni.showToast({ title: '知识图谱开发中', icon: 'none', duration: 1500 })
       } else if (tab === 'settings') {
-        uni.showToast({ title: '设置页开发中', icon: 'none', duration: 1500 })
+        uni.navigateTo({ url: '/pages/settings/settings' })
       }
     },
 

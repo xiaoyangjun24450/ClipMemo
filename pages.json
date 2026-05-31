@@ -5,6 +5,12 @@
 			"style": {
 				"navigationBarTitleText": "ClipMemo"
 			}
+		},
+		{
+			"path": "pages/settings/settings",
+			"style": {
+				"navigationBarTitleText": "设置"
+			}
 		}
 	],
 	"globalStyle": {
