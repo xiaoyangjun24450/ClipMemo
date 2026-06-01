@@ -302,12 +302,26 @@
         <input
           class="dialog-input"
           v-model="newTypeName"
-          placeholder="输入类型名称，如「银行卡」"
+          placeholder="输入类型名称，如「脑洞」"
           :focus="true"
         />
         <view class="dialog-actions">
           <view class="dialog-btn cancel" @click="cancelAddType">取消</view>
           <view class="dialog-btn confirm" @click="confirmAddType">确定</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 删除类型确认弹窗 -->
+    <view v-if="showDeleteTypeConfirm" class="overlay" @click="cancelDeleteType">
+      <view class="type-dialog" @click.stop>
+        <text class="dialog-title">确认删除类型</text>
+        <text class="dialog-desc">
+          删除「{{ pendingDeleteTypeLabel }}」后，{{ pendingDeleteTypeAffectedCount > 0 ? '已标记为该类型的 ' + pendingDeleteTypeAffectedCount + ' 条内容将被改为「未知文本」；' : '' }}此操作不可撤销。确定删除吗？
+        </text>
+        <view class="dialog-actions">
+          <view class="dialog-btn cancel" @click="cancelDeleteType">取消</view>
+          <view class="dialog-btn confirm danger" @click="confirmDeleteType">确定删除</view>
         </view>
       </view>
     </view>
@@ -845,6 +859,17 @@ export default {
 .dialog-btn.confirm {
   color: #FFF;
   background: #3498DB;
+}
+.dialog-btn.confirm.danger {
+  background: #E74C3C;
+}
+.dialog-desc {
+  display: block;
+  font-size: 26rpx;
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 28rpx;
+  text-align: center;
 }
 
 /* ========== 底部导航栏 ========== */

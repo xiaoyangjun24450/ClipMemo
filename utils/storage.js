@@ -160,6 +160,32 @@ function recordCopyCount(id) {
 	return target.copyCount
 }
 
+/**
+ * 批量将指定类型的内容重置为"未知文本"
+ * @param {string} typeKey - 要重置的类型 key
+ * @returns {number} - 被更新的条数
+ */
+function batchUpdateTypeToText(typeKey) {
+	const history = getHistory()
+	let count = 0
+	for (const item of history) {
+		const effectiveType = item.aiType || item.rawType
+		if (effectiveType === typeKey) {
+			item.rawType = 'text'
+			item.rawTypeLabel = '未知文本'
+			item.aiType = ''
+			item.aiTypeLabel = ''
+			item.typeLabel = '未知文本'
+			item.typeColor = '#95A5A6'
+			count++
+		}
+	}
+	if (count > 0) {
+		saveHistory(history)
+	}
+	return count
+}
+
 export default {
 	getHistory,
 	saveHistory,
@@ -169,5 +195,6 @@ export default {
 	searchClips,
 	getLatestClip,
 	getCollectedCount,
-	recordCopyCount
+	recordCopyCount,
+	batchUpdateTypeToText
 }

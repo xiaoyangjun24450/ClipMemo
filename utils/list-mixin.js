@@ -36,11 +36,17 @@ export const listMixin = {
       _searchTimer: null,
       showAddType: false,
       newTypeName: '',
+      // 删除类型确认
+      showDeleteTypeConfirm: false,
+      pendingDeleteTypeVal: '',
+      pendingDeleteTypeLabel: '',
+      pendingDeleteTypeAffectedCount: 0,
       // 分层搜索结果
       dataSourceResults: [],   // 数据来源匹配结果
       contentResults: [],      // 内容/关键词/描述匹配结果
       dataSourceExpanded: false, // 数据来源是否展开
       dataSourcePreview: 3,    // 数据来源默认预览条数
+      _typeVersion: 0,         // 类型版本号，用于触发 computed 重新计算
     }
   },
 
@@ -88,6 +94,7 @@ export const listMixin = {
     },
 
     typeOptions() {
+      void this._typeVersion  // 标记响应式依赖，确保类型变更时 computed 重新计算
       const allTypes = recognizer.getAllTypes()
       return Object.keys(allTypes).map(k => ({
         value: k,
@@ -110,7 +117,7 @@ export const listMixin = {
   },
 
   mounted() {
-    recognizer.onChange(() => this.$forceUpdate())
+    recognizer.onChange(() => { this._typeVersion++ })
   },
 
   onShow() {
@@ -416,8 +423,15 @@ export const listMixin = {
       const target = history.find(h => h.id === this.detailItem.id)
       if (!target) return
 
+      // 如果用户手动改了类型，清除 AI 类型以让手动选择生效
+      const newRawType = this.detailItem.rawType
+      if (newRawType && newRawType !== (target.aiType || target.rawType || 'text')) {
+        target.aiType = ''
+        target.aiTypeLabel = ''
+      }
+
       target.content = this.detailItem.content
-      target.rawType = this.detailItem.rawType
+      target.rawType = newRawType
       target.typeColor = this.detailItem.typeColor
       target.rawTypeLabel = this.detailItem.typeLabel
       target.summary = this.detailItem.description
@@ -471,7 +485,41 @@ export const listMixin = {
     },
 
     doDeleteCustomType(typeVal) {
+      // 统计使用该类型的条目数
+      const allTypes = recognizer.getAllTypes()
+      const typeLabel = allTypes[typeVal] ? allTypes[typeVal].label : typeVal
+      const affectedCount = this.clipList.filter(item => (item.aiType || item.rawType) === typeVal).length
+
+      // 打开确认弹窗
+      this.pendingDeleteTypeVal = typeVal
+      this.pendingDeleteTypeLabel = typeLabel
+      this.pendingDeleteTypeAffectedCount = affectedCount
+      this.showDeleteTypeConfirm = true
+    },
+
+    cancelDeleteType() {
+      this.showDeleteTypeConfirm = false
+      this.pendingDeleteTypeVal = ''
+      this.pendingDeleteTypeLabel = ''
+      this.pendingDeleteTypeAffectedCount = 0
+    },
+
+    confirmDeleteType() {
+      const typeVal = this.pendingDeleteTypeVal
+      const typeLabel = this.pendingDeleteTypeLabel
+      const affectedCount = this.pendingDeleteTypeAffectedCount
+
+      // 关闭弹窗
+      this.cancelDeleteType()
+
+      // 批量将使用该类型的内容改为未知文本
+      if (affectedCount > 0) {
+        storage.batchUpdateTypeToText(typeVal)
+      }
+
+      // 删除自定义类型
       recognizer.deleteCustomType(typeVal)
+
       // 如果当前详情项正在使用被删除的类型，切换回未知文本
       if (this.detailItem && this.detailItem.rawType === typeVal) {
         const textCfg = recognizer.getAllTypes().text
@@ -479,7 +527,13 @@ export const listMixin = {
         this.detailItem.typeColor = textCfg.color
         this.detailItem.typeLabel = textCfg.label
       }
-      uni.showToast({ title: '已移除', icon: 'none', duration: 1500 })
+
+      // 刷新列表
+      if (affectedCount > 0) {
+        this.loadList()
+      }
+
+      uni.showToast({ title: '已删除类型"' + typeLabel + '"', icon: 'none', duration: 1500 })
     },
 
     // ==================== 分页 ====================

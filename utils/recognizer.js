@@ -6,10 +6,7 @@
 const STORAGE_KEY = 'clip_custom_types'
 
 const PRESET_TYPES = {
-  phone:    { label: '手机号', color: '#1ABC9C' },
   text:     { label: '未知文本', color: '#95A5A6' },
-  url:      { label: '链接', color: '#27AE60' },
-  password: { label: '密码', color: '#E74C3C' },
 }
 
 const CUSTOM_COLORS = ['#8E44AD', '#E67E22', '#F39C12', '#3498DB', '#2C3E50', '#E74C3C', '#1ABC9C', '#27AE60']
