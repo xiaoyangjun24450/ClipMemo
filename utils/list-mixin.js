@@ -32,6 +32,8 @@ export const listMixin = {
       clipList: [],
       displayCount: 20,
       _searchTimer: null,
+      showAddType: false,
+      newTypeName: '',
     }
   },
 
@@ -47,12 +49,12 @@ export const listMixin = {
     },
 
     typeOptions() {
-      const config = recognizer.TYPE_CONFIG
-      return Object.keys(config).map(k => ({
+      const allTypes = recognizer.getAllTypes()
+      return Object.keys(allTypes).map(k => ({
         value: k,
-        icon: config[k].icon,
-        label: config[k].label,
-        color: config[k].color,
+        label: allTypes[k].label,
+        color: allTypes[k].color,
+        custom: allTypes[k].custom || false,
       }))
     },
 
@@ -66,6 +68,10 @@ export const listMixin = {
         label: sortUtil.SORT_MODES[k].label,
       }))
     },
+  },
+
+  mounted() {
+    recognizer.onChange(() => this.$forceUpdate())
   },
 
   onShow() {
@@ -114,9 +120,9 @@ export const listMixin = {
     // ==================== 格式化 ====================
     _getTypeDisplay(item) {
       const type = item.aiType || item.rawType || 'text'
-      const config = recognizer.TYPE_CONFIG[type] || recognizer.TYPE_CONFIG.text
+      const allTypes = recognizer.getAllTypes()
+      const config = allTypes[type] || allTypes.text
       return {
-        typeIcon: config.icon,
         typeColor: config.color,
         typeLabel: item.aiTypeLabel || item.rawTypeLabel || config.label,
       }
@@ -139,7 +145,7 @@ export const listMixin = {
         if (!text || !text.trim()) return
         const history = storage.getHistory()
         if (history.length > 0 && history[0].content === text) return
-        const raw = recognizer.recognize(text)
+        const raw = { type: 'text', label: '未知文本', color: '#95A5A6' }
         this.pendingContent = text
         this.pendingRaw = raw
         this.$nextTick(() => {
@@ -177,7 +183,7 @@ export const listMixin = {
       storage.addClip(item.content, {
         rawType: item.type,
         rawTypeLabel: item.label,
-        typeIcon: item.icon,
+        typeLabel: item.label,
         typeColor: item.color,
         copyCount: 0,
         tags: [],
@@ -250,7 +256,6 @@ export const listMixin = {
         source: item.source || '',
         keywords: (item.keywords || []).join(', '),
         tags: [...(item.tags || [])],
-        typeIcon: item.typeIcon,
         typeColor: item.typeColor,
         typeLabel: item.typeLabel,
         copyCount: item.copyCount || 0,
@@ -264,9 +269,9 @@ export const listMixin = {
 
     selectType(typeVal) {
       if (!this.detailItem) return
-      const cfg = recognizer.TYPE_CONFIG[typeVal]
+      const allTypes = recognizer.getAllTypes()
+      const cfg = allTypes[typeVal]
       this.detailItem.rawType = typeVal
-      this.detailItem.typeIcon = cfg.icon
       this.detailItem.typeColor = cfg.color
       this.detailItem.typeLabel = cfg.label
     },
@@ -279,7 +284,6 @@ export const listMixin = {
 
       target.content = this.detailItem.content
       target.rawType = this.detailItem.rawType
-      target.typeIcon = this.detailItem.typeIcon
       target.typeColor = this.detailItem.typeColor
       target.rawTypeLabel = this.detailItem.typeLabel
       target.description = this.detailItem.description
@@ -308,6 +312,41 @@ export const listMixin = {
       } else if (tab === 'settings') {
         uni.navigateTo({ url: '/pages/settings/settings' })
       }
+    },
+
+    // ==================== 自定义类型 ====================
+    showAddTypeDialog() {
+      this.showAddType = true
+      this.newTypeName = ''
+    },
+
+    cancelAddType() {
+      this.showAddType = false
+      this.newTypeName = ''
+    },
+
+    confirmAddType() {
+      const name = this.newTypeName.trim()
+      if (!name) {
+        uni.showToast({ title: '请输入类型名称', icon: 'none', duration: 1500 })
+        return
+      }
+      recognizer.addCustomType(name)
+      this.showAddType = false
+      this.newTypeName = ''
+      uni.showToast({ title: '已添加"' + name + '"', icon: 'success', duration: 1500 })
+    },
+
+    doDeleteCustomType(typeVal) {
+      recognizer.deleteCustomType(typeVal)
+      // 如果当前详情项正在使用被删除的类型，切换回未知文本
+      if (this.detailItem && this.detailItem.rawType === typeVal) {
+        const textCfg = recognizer.getAllTypes().text
+        this.detailItem.rawType = 'text'
+        this.detailItem.typeColor = textCfg.color
+        this.detailItem.typeLabel = textCfg.label
+      }
+      uni.showToast({ title: '已移除', icon: 'none', duration: 1500 })
     },
 
     // ==================== 分页 ====================

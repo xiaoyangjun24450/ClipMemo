@@ -61,8 +61,7 @@
       >
         <view class="card-header">
           <view class="card-type" :style="{ color: item.typeColor || '#95A5A6' }">
-            <text>{{ item.typeIcon || '💬' }}</text>
-            <text class="card-type-label">{{ item.typeLabel || '文本' }}</text>
+            <text class="card-type-label">{{ item.typeLabel || '未知文本' }}</text>
           </view>
         </view>
         <view class="card-tags" v-if="item.tags && item.tags.length > 0">
@@ -102,8 +101,7 @@
           <view class="panel-content">{{ analyzeItem.content }}</view>
         </scroll-view>
         <view class="panel-recognize">
-          <text class="panel-recognize-icon">{{ analyzeItem.typeIcon || '💬' }}</text>
-          <text>识别类型：{{ analyzeItem.typeLabel || '文本' }}</text>
+          <text>识别类型：{{ analyzeItem.typeLabel || '未知文本' }}</text>
         </view>
         <view class="panel-actions">
           <view class="panel-btn ignore" @click="closeAnalyze">不存</view>
@@ -133,7 +131,11 @@
                 :style="detailItem.rawType === opt.value ? { borderColor: opt.color, background: opt.color + '18' } : {}"
                 @click="selectType(opt.value)"
               >
-                <text>{{ opt.icon }} {{ opt.label }}</text>
+                <text>{{ opt.label }}</text>
+                <text v-if="opt.custom" class="type-del" @click.stop="doDeleteCustomType(opt.value)">×</text>
+              </view>
+              <view class="type-option type-add" @click="showAddTypeDialog">
+                <text>+ 新增</text>
               </view>
             </scroll-view>
           </view>
@@ -185,6 +187,23 @@
         </view>
         <view class="detail-actions">
           <view class="panel-btn local" @click="saveDetail">保存修改</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 新增类型弹窗 -->
+    <view v-if="showAddType" class="overlay" @click="cancelAddType">
+      <view class="type-dialog" @click.stop>
+        <text class="dialog-title">添加新类型</text>
+        <input
+          class="dialog-input"
+          v-model="newTypeName"
+          placeholder="输入类型名称，如「银行卡」"
+          :focus="true"
+        />
+        <view class="dialog-actions">
+          <view class="dialog-btn cancel" @click="cancelAddType">取消</view>
+          <view class="dialog-btn confirm" @click="confirmAddType">确定</view>
         </view>
       </view>
     </view>
@@ -375,7 +394,6 @@ export default {
   font-size: 22rpx;
 }
 .card-type-label {
-  margin-left: 6rpx;
   font-weight: 500;
 }
 .card-tags {
@@ -503,10 +521,6 @@ export default {
   font-size: 26rpx;
   color: #666;
 }
-.panel-recognize-icon {
-  font-size: 30rpx;
-  margin-right: 10rpx;
-}
 .panel-actions {
   display: flex;
   padding: 20rpx 24rpx;
@@ -574,6 +588,17 @@ export default {
 .type-option.active {
   font-weight: 500;
 }
+.type-del {
+  margin-left: 8rpx;
+  font-size: 28rpx;
+  color: #E74C3C;
+  font-weight: bold;
+  padding: 0 4rpx;
+}
+.type-add {
+  border-style: dashed;
+  color: #3498DB;
+}
 .detail-input {
   width: 100%;
   height: 72rpx;
@@ -598,6 +623,56 @@ export default {
 }
 .detail-actions {
   padding: 8rpx 24rpx 24rpx;
+}
+
+/* ========== 新增类型弹窗 ========== */
+.type-dialog {
+  width: 560rpx;
+  background: #FFF;
+  border-radius: 20rpx;
+  padding: 36rpx;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 210;
+}
+.dialog-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 28rpx;
+  text-align: center;
+}
+.dialog-input {
+  width: 100%;
+  height: 80rpx;
+  background: #F5F5F5;
+  border-radius: 12rpx;
+  padding: 0 20rpx;
+  font-size: 28rpx;
+  box-sizing: border-box;
+  margin-bottom: 28rpx;
+}
+.dialog-actions {
+  display: flex;
+  gap: 20rpx;
+}
+.dialog-btn {
+  flex: 1;
+  text-align: center;
+  padding: 20rpx 0;
+  border-radius: 24rpx;
+  font-size: 28rpx;
+  font-weight: 500;
+}
+.dialog-btn.cancel {
+  color: #999;
+  background: #F5F5F5;
+}
+.dialog-btn.confirm {
+  color: #FFF;
+  background: #3498DB;
 }
 
 /* ========== 底部导航栏 ========== */

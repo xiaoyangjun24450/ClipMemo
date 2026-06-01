@@ -73,7 +73,7 @@ export default {
 		// 初始化剪贴板监控
 		async initClipboardMonitor() {
 			await clipboard.initClipboardMonitor((newContent) => {
-				const clip = storage.addClip(newContent, { rawType: 'text', rawTypeLabel: '文本' })
+				const clip = storage.addClip(newContent, { rawType: 'text', rawTypeLabel: '未知文本' })
 				const preview = notification.formatContentForNotification(clip.content)
 				notification.updateNotification(preview)
 				console.log('新剪贴内容已收录:', clip.id)
