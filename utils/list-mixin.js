@@ -22,6 +22,8 @@ export const listMixin = {
       activeTab: 'home',
       searchKeyword: '',
       searchFocused: false,
+      typeFilter: '',          // 类型过滤：空=全部，否则为指定类型值
+      typeFilterOptions: [],   // 类型过滤选项列表
       sortMode: '',
       sortVisible: false,
       pendingContent: null,
@@ -34,11 +36,48 @@ export const listMixin = {
       _searchTimer: null,
       showAddType: false,
       newTypeName: '',
+      // 分层搜索结果
+      dataSourceResults: [],   // 数据来源匹配结果
+      contentResults: [],      // 内容/关键词/描述匹配结果
+      dataSourceExpanded: false, // 数据来源是否展开
+      dataSourcePreview: 3,    // 数据来源默认预览条数
     }
   },
 
   computed: {
+    // 是否处于搜索模式
+    isSearchMode() {
+      return !!this.searchKeyword || !!this.typeFilter
+    },
+
+    // 数据来源显示的条数（未展开时预览3条）
+    visibleDataSourceResults() {
+      if (!this.dataSourceResults.length) return []
+      return this.dataSourceExpanded
+        ? this.dataSourceResults
+        : this.dataSourceResults.slice(0, this.dataSourcePreview)
+    },
+
+    // 展示列表：搜索模式下使用分层结果，否则显示普通列表
     displayList() {
+      if (this.isSearchMode) {
+        // 搜索模式：拼接数据来源 + 内容/关键词/描述 结果（去重）
+        const all = []
+        const seen = new Set()
+        for (const item of this.dataSourceResults) {
+          if (!seen.has(item.id)) {
+            all.push(item)
+            seen.add(item.id)
+          }
+        }
+        for (const item of this.contentResults) {
+          if (!seen.has(item.id)) {
+            all.push(item)
+            seen.add(item.id)
+          }
+        }
+        return all.slice(0, this.displayCount)
+      }
       return this.clipList.slice(0, this.displayCount)
     },
 
@@ -95,6 +134,34 @@ export const listMixin = {
         ...item,
         ...this._getTypeDisplay(item),
       }))
+      // 构建类型过滤选项（从实际数据中提取已有类型）
+      this._buildTypeFilterOptions()
+      // 如果当前在搜索模式，重新触发搜索
+      if (this.isSearchMode) {
+        this._doLayeredSearch()
+      }
+    },
+
+    /**
+     * 从当前列表中提取已有类型，构建过滤选项
+     */
+    _buildTypeFilterOptions() {
+      const seen = new Set()
+      const options = [{ value: '', label: '全部类型', color: '#95A5A6' }]
+      for (const item of this.clipList) {
+        const typeVal = item.aiType || item.rawType || 'text'
+        if (!seen.has(typeVal)) {
+          seen.add(typeVal)
+          const allTypes = recognizer.getAllTypes()
+          const cfg = allTypes[typeVal]
+          options.push({
+            value: typeVal,
+            label: cfg ? cfg.label : (item.aiTypeLabel || item.rawTypeLabel || typeVal),
+            color: cfg ? cfg.color : (item.typeColor || '#95A5A6'),
+          })
+        }
+      }
+      this.typeFilterOptions = options
     },
 
     applySort() {
@@ -245,21 +312,56 @@ export const listMixin = {
     onSearchInput() {
       if (this._searchTimer) clearTimeout(this._searchTimer)
       this._searchTimer = setTimeout(() => {
-        if (this.searchKeyword) {
-          const raw = searchUtil.searchFromStorage(this.searchKeyword)
-          this.clipList = raw.map(item => ({
-            ...item,
-            ...this._getTypeDisplay(item),
-          }))
-        } else {
-          this.loadList()
-        }
+        this._doLayeredSearch()
       }, 200)
+    },
+
+    /**
+     * 执行分层搜索
+     */
+    _doLayeredSearch() {
+      if (this.searchKeyword || this.typeFilter) {
+        const result = searchUtil.layeredSearch(
+          this.searchKeyword,
+          this.typeFilter || null,
+          this.clipList
+        )
+        this.dataSourceResults = result.dataSourceResults
+        this.contentResults = result.contentResults
+        this.dataSourceExpanded = false
+        this.displayCount = 20
+      } else {
+        this.dataSourceResults = []
+        this.contentResults = []
+        this.loadList()
+      }
+    },
+
+    /**
+     * 选择类型过滤
+     */
+    selectTypeFilter(value) {
+      this.typeFilter = value
+      if (this._searchTimer) clearTimeout(this._searchTimer)
+      this._searchTimer = setTimeout(() => {
+        this._doLayeredSearch()
+      }, 100)
+    },
+
+    /**
+     * 展开/收起数据来源结果
+     */
+    toggleDataSourceExpand() {
+      this.dataSourceExpanded = !this.dataSourceExpanded
     },
 
     clearSearch() {
       this.searchKeyword = ''
+      this.typeFilter = ''
       this.searchFocused = false
+      this.dataSourceResults = []
+      this.contentResults = []
+      this.dataSourceExpanded = false
       this.loadList()
     },
 

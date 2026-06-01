@@ -21,6 +21,22 @@
       </view>
     </view>
 
+    <!-- 类型过滤条 -->
+    <view v-if="searchFocused || typeFilter" class="type-filter-bar">
+      <scroll-view class="type-filter-scroll" scroll-x :show-scrollbar="false">
+        <view
+          v-for="opt in typeFilterOptions"
+          :key="opt.value"
+          class="type-filter-chip"
+          :class="{ active: typeFilter === opt.value }"
+          :style="typeFilter === opt.value ? { borderColor: opt.color, background: opt.color + '18', color: opt.color } : {}"
+          @click="selectTypeFilter(opt.value)"
+        >
+          <text>{{ opt.label }}</text>
+        </view>
+      </scroll-view>
+    </view>
+
     <!-- 排序下拉 -->
     <view v-if="sortVisible" class="sort-mask" @click="toggleSort">
       <view class="sort-dropdown" @click.stop>
@@ -46,9 +62,93 @@
       </view>
     </view>
 
-    <!-- 内容列表 -->
+    <!-- 搜索模式：分层结果 -->
     <scroll-view
-      v-if="displayList.length > 0"
+      v-if="isSearchMode && (dataSourceResults.length > 0 || contentResults.length > 0)"
+      class="list"
+      scroll-y
+      @scrolltolower="loadMore"
+    >
+      <!-- 数据来源匹配 -->
+      <view v-if="dataSourceResults.length > 0" class="search-section">
+        <view class="section-header">
+          <text class="section-title">📡 数据来源匹配</text>
+          <text class="section-count">{{ dataSourceResults.length }}条</text>
+        </view>
+        <view
+          v-for="item in visibleDataSourceResults"
+          :key="'ds-' + item.id"
+          class="clip-card"
+          @click="openDetail(item)"
+        >
+          <view class="card-header">
+            <view class="card-type" :style="{ color: item.typeColor || '#95A5A6' }">
+              <text class="card-type-label">{{ item.typeLabel || '未知文本' }}</text>
+            </view>
+            <text v-if="item.dataSource" class="card-source-tag">{{ item.dataSource }}</text>
+          </view>
+          <view class="card-content">{{ formatPreview(item.content) }}</view>
+          <view class="card-footer">
+            <text class="card-time">{{ formatTime(item.time) }}</text>
+            <text v-if="item.copyCount > 0" class="card-count">· 已复制{{ item.copyCount }}次</text>
+          </view>
+          <view class="card-actions">
+            <view class="action-btn copy" @click.stop="doCopy(item)">
+              <text>复制</text>
+            </view>
+            <view class="action-btn delete" @click.stop="deleteItem(item)">
+              <text>删除</text>
+            </view>
+          </view>
+        </view>
+        <!-- 展开/收起按钮 -->
+        <view
+          v-if="dataSourceResults.length > dataSourcePreview"
+          class="expand-btn"
+          @click="toggleDataSourceExpand"
+        >
+          <text>{{ dataSourceExpanded ? '收起' : '展开全部 (' + dataSourceResults.length + '条)' }}</text>
+          <text class="expand-arrow">{{ dataSourceExpanded ? '▲' : '▼' }}</text>
+        </view>
+      </view>
+
+      <!-- 内容/关键词/描述匹配 -->
+      <view v-if="contentResults.length > 0" class="search-section">
+        <view class="section-header">
+          <text class="section-title">📝 内容 / 关键词 / 描述匹配</text>
+          <text class="section-count">{{ contentResults.length }}条</text>
+        </view>
+        <view
+          v-for="item in contentResults"
+          :key="'ct-' + item.id"
+          class="clip-card"
+          @click="openDetail(item)"
+        >
+          <view class="card-header">
+            <view class="card-type" :style="{ color: item.typeColor || '#95A5A6' }">
+              <text class="card-type-label">{{ item.typeLabel || '未知文本' }}</text>
+            </view>
+          </view>
+          <view class="card-content">{{ formatPreview(item.content) }}</view>
+          <view class="card-footer">
+            <text class="card-time">{{ formatTime(item.time) }}</text>
+            <text v-if="item.copyCount > 0" class="card-count">· 已复制{{ item.copyCount }}次</text>
+          </view>
+          <view class="card-actions">
+            <view class="action-btn copy" @click.stop="doCopy(item)">
+              <text>复制</text>
+            </view>
+            <view class="action-btn delete" @click.stop="deleteItem(item)">
+              <text>删除</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+
+    <!-- 非搜索模式：普通列表 -->
+    <scroll-view
+      v-else-if="!isSearchMode && displayList.length > 0"
       class="list"
       scroll-y
       @scrolltolower="loadMore"
@@ -80,7 +180,14 @@
       </view>
     </scroll-view>
 
-    <!-- 空态 -->
+    <!-- 搜索空态 -->
+    <view v-else-if="isSearchMode" class="empty">
+      <text class="empty-icon">🔍</text>
+      <text class="empty-text">没有找到匹配的内容</text>
+      <text class="empty-sub">试试换个关键词或类型</text>
+    </view>
+
+    <!-- 普通空态 -->
     <view v-else class="empty">
       <text class="empty-icon">📋</text>
       <text class="empty-text">还没有内容</text>
@@ -157,9 +264,9 @@
             />
           </view>
 
-          <!-- 索引关键字 -->
+          <!-- 关键词 -->
           <view class="detail-field">
-            <text class="detail-label">索引关键字</text>
+            <text class="detail-label">关键词</text>
             <input
               class="detail-input"
               v-model="detailItem.keywords"
@@ -449,6 +556,84 @@ export default {
 .empty-sub {
   font-size: 26rpx;
   color: #999;
+}
+
+/* ========== 类型过滤条 ========== */
+.type-filter-bar {
+  background: #FFFFFF;
+  padding: 12rpx 24rpx 16rpx;
+  border-bottom: 1rpx solid #F0F0F0;
+  position: sticky;
+  top: 96rpx;
+  z-index: 99;
+}
+.type-filter-scroll {
+  white-space: nowrap;
+}
+.type-filter-chip {
+  display: inline-block;
+  font-size: 24rpx;
+  padding: 8rpx 24rpx;
+  border-radius: 24rpx;
+  border: 2rpx solid #E8E8E8;
+  margin-right: 12rpx;
+  color: #666;
+  background: #F8F8F8;
+  transition: all 0.2s;
+}
+.type-filter-chip.active {
+  font-weight: 500;
+}
+
+/* ========== 搜索分区 ========== */
+.search-section {
+  margin-bottom: 8rpx;
+}
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 24rpx 8rpx;
+}
+.section-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #333;
+}
+.section-count {
+  font-size: 22rpx;
+  color: #999;
+  background: #F0F0F0;
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+}
+
+/* ========== 卡片来源标签 ========== */
+.card-source-tag {
+  font-size: 20rpx;
+  color: #3498DB;
+  background: #E8F4FD;
+  padding: 2rpx 12rpx;
+  border-radius: 12rpx;
+  margin-left: 12rpx;
+}
+
+/* ========== 展开/收起按钮 ========== */
+.expand-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20rpx 0;
+  margin: 0 24rpx;
+  font-size: 26rpx;
+  color: #3498DB;
+  background: #F5F9FF;
+  border-radius: 12rpx;
+  border: 1rpx dashed #B0D4F1;
+}
+.expand-arrow {
+  margin-left: 8rpx;
+  font-size: 22rpx;
 }
 
 /* ========== 遮罩 ========== */
