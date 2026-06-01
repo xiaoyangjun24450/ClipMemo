@@ -65,6 +65,7 @@ function addClip(content, extra = {}) {
 		aiTypeLabel: extra.aiTypeLabel || '',
 		tags: extra.tags || [],
 		summary: extra.summary || '',
+		dataSource: extra.dataSource || '',
 		typeLabel: extra.typeLabel || '未知文本',
 		typeColor: extra.typeColor || '#95A5A6',
 		copyCount: extra.copyCount || 0,

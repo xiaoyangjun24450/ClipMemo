@@ -1,18 +1,36 @@
 /**
  * 后端交互模块
  * 负责与云端 API 通信：AI 分析、语义搜索、同步等
- *
- * TODO: 后端接口就绪后实现
  */
+
+import recognizer from './recognizer.js'
 
 /**
  * 发送指定内容给后端（AI 分析）
- * @param {object} clip - 单条剪贴内容 { id, content, rawType, ... }
- * @returns {Promise<{ aiType: string, aiTypeLabel: string, tags: string[], summary: string }>}
+ * @param {object} clip - 单条剪贴内容 { content: string }
+ * @returns {Promise<{ aiType: string, dataSource: string, description: string, keywords: string[] }>}
  */
 function analyzeClip(clip) {
-  // TODO
-  return Promise.reject(new Error('后端接口尚未接入'))
+  const types = recognizer.getAllTypes()
+  return new Promise((resolve, reject) => {
+    uniCloud.callFunction({
+      name: 'clip-analyze',
+      data: {
+        content: clip.content,
+        types: types,
+      },
+      success(res) {
+        if (res.result && res.result.code === 0) {
+          resolve(res.result.data)
+        } else {
+          reject(new Error((res.result && res.result.msg) || 'AI分析失败'))
+        }
+      },
+      fail(err) {
+        reject(err)
+      },
+    })
+  })
 }
 
 /**

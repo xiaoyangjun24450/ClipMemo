@@ -6,8 +6,7 @@
  *   - search.js      → 检索模块（本地搜索）
  *   - recognizer.js  → 本地类型识别
  *   - time.js        → 时间格式化
- *
- * TODO: 后端交互模块 (api.js) 接入后，saveWithAI 可改为调用 api.analyzeClip
+ *   - api.js         → 后端交互模块（AI 分析、同步、搜索）
  */
 import storage from '@/utils/storage.js'
 import clipboard from '@/utils/clipboard.js'
@@ -15,6 +14,7 @@ import recognizer from '@/utils/recognizer.js'
 import timeUtil from '@/utils/time.js'
 import searchUtil from '@/utils/search.js'
 import sortUtil from '@/utils/sort.js'
+import api from '@/utils/api.js'
 
 export const listMixin = {
   data() {
@@ -194,8 +194,41 @@ export const listMixin = {
     },
 
     saveWithAI() {
-      // TODO: 接入后端 API 实现 AI 分析
-      this.saveLocal()
+      const item = this.analyzeItem
+      if (!item || !item.content) return
+
+      uni.showLoading({ title: 'AI 分析中...', mask: true })
+
+      api.analyzeClip({ content: item.content }).then(result => {
+        uni.hideLoading()
+
+        // 匹配类型颜色
+        const allTypes = recognizer.getAllTypes()
+        const matchedType = allTypes[result.aiType]
+        const typeLabel = matchedType ? matchedType.label : result.aiType
+        const typeColor = matchedType ? matchedType.color : '#3498DB'
+
+        storage.addClip(item.content, {
+          rawType: item.type,
+          rawTypeLabel: item.label,
+          aiType: result.aiType,
+          aiTypeLabel: typeLabel,
+          typeLabel: typeLabel,
+          typeColor: typeColor,
+          tags: result.keywords || [],
+          summary: result.description || '',
+          dataSource: result.dataSource || '',
+          copyCount: 0,
+        })
+        this.closeAnalyze()
+        this.loadList()
+        uni.showToast({ title: '已保存并完成AI分析', icon: 'success', duration: 1500 })
+      }).catch(err => {
+        uni.hideLoading()
+        console.error('AI分析失败，降级为本地保存:', err)
+        this.saveLocal()
+        uni.showToast({ title: 'AI分析失败，已本地保存', icon: 'none', duration: 2000 })
+      })
     },
 
     // ==================== 搜索 ====================
@@ -252,10 +285,9 @@ export const listMixin = {
         id: item.id,
         content: item.content,
         rawType: currentType,
-        description: item.description || '',
-        source: item.source || '',
-        keywords: (item.keywords || []).join(', '),
-        tags: [...(item.tags || [])],
+        description: item.summary || '',
+        source: item.dataSource || '',
+        keywords: (item.tags || []).join(', '),
         typeColor: item.typeColor,
         typeLabel: item.typeLabel,
         copyCount: item.copyCount || 0,
@@ -286,12 +318,11 @@ export const listMixin = {
       target.rawType = this.detailItem.rawType
       target.typeColor = this.detailItem.typeColor
       target.rawTypeLabel = this.detailItem.typeLabel
-      target.description = this.detailItem.description
-      target.source = this.detailItem.source
-      target.keywords = this.detailItem.keywords
+      target.summary = this.detailItem.description
+      target.dataSource = this.detailItem.source
+      target.tags = this.detailItem.keywords
         ? this.detailItem.keywords.split(',').map(s => s.trim()).filter(Boolean)
         : []
-      target.tags = this.detailItem.tags
 
       storage.saveHistory(history)
       this.closeDetail()

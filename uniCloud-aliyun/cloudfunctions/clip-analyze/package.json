@@ -1,0 +1,6 @@
+{
+  "name": "clip-analyze",
+  "version": "1.0.0",
+  "description": "AI 分析剪贴内容，生成类型、来源、摘要与检索关键词",
+  "main": "index.js"
+}

@@ -64,9 +64,6 @@
             <text class="card-type-label">{{ item.typeLabel || '未知文本' }}</text>
           </view>
         </view>
-        <view class="card-tags" v-if="item.tags && item.tags.length > 0">
-          <text v-for="tag in item.tags" :key="tag" class="card-tag">#{{ tag }}</text>
-        </view>
         <view class="card-content">{{ formatPreview(item.content) }}</view>
         <view class="card-footer">
           <text class="card-time">{{ formatTime(item.time) }}</text>
@@ -395,16 +392,6 @@ export default {
 }
 .card-type-label {
   font-weight: 500;
-}
-.card-tags {
-  display: flex;
-  flex-wrap: wrap;
-  margin-bottom: 10rpx;
-}
-.card-tag {
-  font-size: 22rpx;
-  color: #3498DB;
-  margin-right: 12rpx;
 }
 .card-content {
   font-size: 28rpx;
