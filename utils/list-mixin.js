@@ -15,6 +15,8 @@ import timeUtil from '@/utils/time.js'
 import searchUtil from '@/utils/search.js'
 import sortUtil from '@/utils/sort.js'
 import api from '@/utils/api.js'
+import gallery from '@/utils/gallery.js'
+import imageHelper from '@/utils/image-helper.js'
 
 export const listMixin = {
   data() {
@@ -28,6 +30,8 @@ export const listMixin = {
       sortVisible: false,
       pendingContent: null,
       pendingRaw: null,
+      pendingType: 'text',       // 'text' | 'image'
+      pendingImageInfo: null,    // { path, timestamp, size, width, height }
       notifyShow: false,
       analyzeItem: null,
       detailItem: null,
@@ -104,6 +108,35 @@ export const listMixin = {
       }))
     },
 
+    /**
+     * 详情弹窗中根据当前项的 mediaType 过滤可选类型
+     * 图片项仅显示 image 类型；文字项显示所有非 image 类型
+     */
+    detailTypeOptions() {
+      if (!this.detailItem) return this.typeOptions
+      void this._typeVersion
+      const allTypes = recognizer.getAllTypes()
+      const mediaType = this.detailItem.mediaType || 'text'
+      if (mediaType === 'image') {
+        // 图片项：只显示 image 类型（同时也保留当前选中类型以防切换）
+        const result = [{ value: 'image', label: allTypes.image.label, color: allTypes.image.color, custom: false }]
+        const curType = this.detailItem.rawType
+        if (curType && curType !== 'image' && allTypes[curType]) {
+          result.push({ value: curType, label: allTypes[curType].label, color: allTypes[curType].color, custom: allTypes[curType].custom || false })
+        }
+        return result
+      }
+      // 文字项：排除 image
+      return Object.keys(allTypes)
+        .filter(k => k !== 'image')
+        .map(k => ({
+          value: k,
+          label: allTypes[k].label,
+          color: allTypes[k].color,
+          custom: allTypes[k].custom || false,
+        }))
+    },
+
     sortLabel() {
       return sortUtil.SORT_MODES[this.sortMode] ? sortUtil.SORT_MODES[this.sortMode].label : '排序'
     },
@@ -122,7 +155,7 @@ export const listMixin = {
 
   onShow() {
     this.loadList()
-    this.checkNewClip()
+    this.checkNewContent()
   },
 
   onUnload() {
@@ -212,53 +245,186 @@ export const listMixin = {
       return timeUtil.relativeTime(ts)
     },
 
+    formatFileSize(bytes) {
+      if (!bytes || bytes <= 0) return '0 B'
+      const units = ['B', 'KB', 'MB', 'GB']
+      let i = 0
+      let size = bytes
+      while (size >= 1024 && i < units.length - 1) {
+        size /= 1024
+        i++
+      }
+      return size.toFixed(i > 0 ? 1 : 0) + ' ' + units[i]
+    },
+
     // ==================== 剪贴板检测 ====================
-    async checkNewClip() {
+    /**
+     * 同时检测剪贴板文本与相册最新图片，比较时间戳
+     * 谁更新就弹谁的通知条
+     */
+    async checkNewContent() {
+      const [clipResult, imageResult] = await Promise.all([
+        this._detectClipboardText(),
+        this._detectLatestImage(),
+      ])
+
+      const IMAGE_RECENT_MS = 120 * 1000
+
+      // 图片在最近 2 分钟内产生 → 说明用户刚刚截图/拍照，优先弹图片通知
+      if (imageResult && imageResult.timestamp > Date.now() - IMAGE_RECENT_MS) {
+        this._showImageNotify(imageResult)
+        return
+      }
+
+      // 图片不新鲜（或没有）→ 弹文本通知（有剪贴板新内容才弹）
+      if (clipResult) {
+        this._showTextNotify(clipResult)
+      }
+    },
+
+    /**
+     * 检测剪贴板是否有新文本
+     * @returns {{ content: string, timestamp: number }|null}
+     */
+    async _detectClipboardText() {
       try {
         const text = await clipboard.getClipboardText()
-        if (!text || !text.trim()) return
+        if (!text || !text.trim()) return null
         const history = storage.getHistory()
-        if (history.length > 0 && history[0].content === text) return
-        const raw = { type: 'text', label: '未知文本', color: '#95A5A6' }
-        this.pendingContent = text
-        this.pendingRaw = raw
-        this.$nextTick(() => {
-          this.notifyShow = true
-        })
+        if (history.length > 0 && history[0].content === text) return null
+        // 剪贴板无法获取精确时间，用当前时间近似
+        return { content: text, timestamp: Date.now() }
       } catch (e) {
         console.error('检测剪贴板失败:', e)
+        return null
       }
+    },
+
+    /**
+     * 检测相册最新图片（仅元数据，不加载图片）
+     * @returns {{ path: string, timestamp: number, ... }|null}
+     */
+    async _detectLatestImage() {
+      try {
+        const img = await gallery.getLatestImage()
+        if (!img || !img.path) {
+          console.log('[detect] 未发现新图片')
+          return null
+        }
+
+        const ageMs = Date.now() - img.timestamp
+        console.log('[detect] 最新图片:', img.path, '时间:', new Date(img.timestamp).toLocaleString(), '距今:', Math.round(ageMs / 1000) + 's')
+
+        const history = storage.getHistory()
+        // 检查是否已收录（通过路径匹配）
+        const alreadySaved = history.some(
+          (item) =>
+            item.mediaType === 'image' &&
+            (item.content === img.path || item.originalPath === img.path)
+        )
+        if (alreadySaved) {
+          console.log('[detect] 图片已收录，跳过')
+          return null
+        }
+
+        return img
+      } catch (e) {
+        console.error('检测最新图片失败:', e)
+        return null
+      }
+    },
+
+    /**
+     * 显示文本通知条
+     */
+    _showTextNotify(clipResult) {
+      console.log('[notify] 弹文本通知条:', clipResult.content.substring(0, 30))
+      const raw = { type: 'text', label: '未知文本', color: '#95A5A6' }
+      this.pendingContent = clipResult.content
+      this.pendingRaw = raw
+      this.pendingType = 'text'
+      this.pendingImageInfo = null
+      this.$nextTick(() => {
+        this.notifyShow = true
+      })
+    },
+
+    /**
+     * 显示图片通知条
+     */
+    _showImageNotify(imageResult) {
+      console.log('[notify] 弹图片通知条:', imageResult.path)
+      this.pendingContent = imageResult.path
+      this.pendingType = 'image'
+      this.pendingImageInfo = {
+        path: imageResult.path,
+        timestamp: imageResult.timestamp,
+        size: imageResult.size,
+        width: imageResult.width,
+        height: imageResult.height,
+      }
+      this.pendingRaw = { type: 'image', label: '图片', color: '#E67E22' }
+      this.$nextTick(() => {
+        this.notifyShow = true
+      })
     },
 
     ignoreClip() {
       this.notifyShow = false
       setTimeout(() => {
         this.pendingContent = null
+        this.pendingType = 'text'
+        this.pendingImageInfo = null
       }, 300)
     },
 
     openAnalyze() {
       this.notifyShow = false
-      this.analyzeItem = {
-        content: this.pendingContent,
-        ...this.pendingRaw,
+      if (this.pendingType === 'image' && this.pendingImageInfo) {
+        // 图片：打开图片预览分析面板
+        this.analyzeItem = {
+          content: this.pendingImageInfo.path,
+          isImage: true,
+          imageInfo: this.pendingImageInfo,
+          ...this.pendingRaw,
+        }
+      } else {
+        // 文本
+        this.analyzeItem = {
+          content: this.pendingContent,
+          isImage: false,
+          ...this.pendingRaw,
+        }
       }
     },
 
     closeAnalyze() {
       this.analyzeItem = null
       this.pendingContent = null
+      this.pendingType = 'text'
+      this.pendingImageInfo = null
       this.pendingRaw = null
     },
 
     // ==================== 保存 ====================
     saveLocal() {
       const item = this.analyzeItem
+      if (!item) return
+
+      if (item.isImage) {
+        this._saveImageLocal(item)
+      } else {
+        this._saveTextLocal(item)
+      }
+    },
+
+    _saveTextLocal(item) {
       storage.addClip(item.content, {
         rawType: item.type,
         rawTypeLabel: item.label,
         typeLabel: item.label,
         typeColor: item.color,
+        mediaType: 'text',
         copyCount: 0,
         tags: [],
       })
@@ -267,9 +433,49 @@ export const listMixin = {
       uni.showToast({ title: '已保存到本地', icon: 'success', duration: 1500 })
     },
 
+    async _saveImageLocal(item) {
+      uni.showLoading({ title: '正在保存...', mask: true })
+      try {
+        const result = await imageHelper.copyToAppDir(item.content)
+        uni.hideLoading()
+
+        if (!result) {
+          uni.showToast({ title: '图片保存失败', icon: 'none', duration: 1500 })
+          return
+        }
+
+        storage.addClip(result.copiedPath, {
+          rawType: item.type || 'image',
+          rawTypeLabel: item.label || '图片',
+          typeLabel: item.label || '图片',
+          typeColor: item.color || '#E67E22',
+          mediaType: 'image',
+          originalPath: item.content,
+          copyCount: 0,
+          tags: [],
+        })
+
+        console.log('[save] 图片已存储, content:', result.copiedPath)
+
+        this.closeAnalyze()
+        this.loadList()
+        uni.showToast({ title: '已保存到本地', icon: 'success', duration: 1500 })
+      } catch (e) {
+        uni.hideLoading()
+        console.error('保存图片失败:', e)
+        uni.showToast({ title: '图片保存失败', icon: 'none', duration: 1500 })
+      }
+    },
+
     saveWithAI() {
       const item = this.analyzeItem
       if (!item || !item.content) return
+
+      if (item.isImage) {
+        // 图片暂时不走 AI 分析，降级为本地保存
+        this._saveImageLocal(item)
+        return
+      }
 
       uni.showLoading({ title: 'AI 分析中...', mask: true })
 
@@ -289,6 +495,7 @@ export const listMixin = {
           aiTypeLabel: typeLabel,
           typeLabel: typeLabel,
           typeColor: typeColor,
+          mediaType: 'text',
           tags: result.keywords || [],
           summary: result.description || '',
           dataSource: result.dataSource || '',
@@ -399,6 +606,7 @@ export const listMixin = {
         keywords: (item.tags || []).join(', '),
         typeColor: item.typeColor,
         typeLabel: item.typeLabel,
+        mediaType: item.mediaType || 'text',
         copyCount: item.copyCount || 0,
         time: item.time,
       }
@@ -406,6 +614,10 @@ export const listMixin = {
 
     closeDetail() {
       this.detailItem = null
+    },
+
+    onDetailImageError(e) {
+      console.error('[detail] 图片加载失败, src:', this.detailItem ? this.detailItem.content : '?', e)
     },
 
     selectType(typeVal) {

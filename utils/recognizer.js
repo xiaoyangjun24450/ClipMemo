@@ -6,7 +6,8 @@
 const STORAGE_KEY = 'clip_custom_types'
 
 const PRESET_TYPES = {
-  text:     { label: '未知文本', color: '#95A5A6' },
+  text:  { label: '未知文本', color: '#95A5A6' },
+  image: { label: '图片', color: '#E67E22' },
 }
 
 const CUSTOM_COLORS = ['#8E44AD', '#E67E22', '#F39C12', '#3498DB', '#2C3E50', '#E74C3C', '#1ABC9C', '#27AE60']
@@ -46,6 +47,32 @@ function saveCustomTypes() {
 function getAllTypes() {
   ensureLoaded()
   return { ...PRESET_TYPES, ...customTypes }
+}
+
+/**
+ * 按媒体类型获取可选类型
+ * 图片仅可选 image 类型；文字可选除 image 外的所有类型
+ * @param {string} mediaType 'text' | 'image'
+ * @param {string} currentType 当前已分配的类型 key（即使不匹配 mediaType 也会保留）
+ */
+function getTypesForMediaType(mediaType, currentType) {
+  const all = getAllTypes()
+  if (mediaType === 'image') {
+    const result = { image: all.image }
+    // 保留当前类型（即使是文字类型，也让它可被选择以改回）
+    if (currentType && currentType !== 'image' && all[currentType]) {
+      result[currentType] = all[currentType]
+    }
+    return result
+  }
+  // 文字类型：排除 image 专用类型
+  const result = {}
+  for (const key in all) {
+    if (key !== 'image') {
+      result[key] = all[key]
+    }
+  }
+  return result
 }
 
 /**
@@ -89,4 +116,4 @@ function isSensitive(type) {
   return ['password'].includes(type)
 }
 
-export default { recognize, isSensitive, getAllTypes, addCustomType, deleteCustomType, onChange }
+export default { recognize, isSensitive, getAllTypes, getTypesForMediaType, addCustomType, deleteCustomType, onChange }

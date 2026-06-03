@@ -53,9 +53,19 @@
     </view>
 
     <!-- 新内容通知条 -->
-    <view v-if="pendingContent" class="notify-bar" :class="{ show: notifyShow }">
+    <!-- 文本类型 -->
+    <view v-if="pendingContent && pendingType === 'text'" class="notify-bar" :class="{ show: notifyShow }">
       <text class="notify-icon">📋</text>
       <text class="notify-text">检测到："{{ pendingPreview }}"</text>
+      <view class="notify-actions">
+        <text class="notify-btn ignore" @click="ignoreClip">忽略</text>
+        <text class="notify-btn view" @click="openAnalyze">查看</text>
+      </view>
+    </view>
+    <!-- 图片类型 -->
+    <view v-if="pendingContent && pendingType === 'image'" class="notify-bar image" :class="{ show: notifyShow }">
+      <text class="notify-icon">🖼️</text>
+      <text class="notify-text">检测到新截图/图片</text>
       <view class="notify-actions">
         <text class="notify-btn ignore" @click="ignoreClip">忽略</text>
         <text class="notify-btn view" @click="openAnalyze">查看</text>
@@ -87,7 +97,13 @@
             </view>
             <text v-if="item.dataSource" class="card-source-tag">{{ item.dataSource }}</text>
           </view>
-          <view class="card-content">{{ formatPreview(item.content) }}</view>
+          <image
+            v-if="item.mediaType === 'image' && item.content"
+            class="card-image"
+            :src="item.content"
+            mode="widthFix"
+          />
+          <view v-else class="card-content">{{ formatPreview(item.content) }}</view>
           <view class="card-footer">
             <text class="card-time">{{ formatTime(item.time) }}</text>
             <text v-if="item.copyCount > 0" class="card-count">· 已复制{{ item.copyCount }}次</text>
@@ -129,7 +145,13 @@
               <text class="card-type-label">{{ item.typeLabel || '未知文本' }}</text>
             </view>
           </view>
-          <view class="card-content">{{ formatPreview(item.content) }}</view>
+          <image
+            v-if="item.mediaType === 'image' && item.content"
+            class="card-image"
+            :src="item.content"
+            mode="widthFix"
+          />
+          <view v-else class="card-content">{{ formatPreview(item.content) }}</view>
           <view class="card-footer">
             <text class="card-time">{{ formatTime(item.time) }}</text>
             <text v-if="item.copyCount > 0" class="card-count">· 已复制{{ item.copyCount }}次</text>
@@ -164,7 +186,14 @@
             <text class="card-type-label">{{ item.typeLabel || '未知文本' }}</text>
           </view>
         </view>
-        <view class="card-content">{{ formatPreview(item.content) }}</view>
+        <!-- 图片类型：显示原图 -->
+        <image
+          v-if="item.mediaType === 'image' && item.content"
+          class="card-image"
+          :src="item.content"
+          mode="widthFix"
+        />
+        <view v-else class="card-content">{{ formatPreview(item.content) }}</view>
         <view class="card-footer">
           <text class="card-time">{{ formatTime(item.time) }}</text>
           <text v-if="item.copyCount > 0" class="card-count">· 已复制{{ item.copyCount }}次</text>
@@ -198,19 +227,36 @@
     <view v-if="analyzeItem" class="overlay" @click="closeAnalyze">
       <view class="analyze-panel" @click.stop>
         <view class="panel-header">
-          <text class="panel-title">剪贴板内容</text>
+          <text class="panel-title">{{ analyzeItem.isImage ? '截图/图片' : '剪贴板内容' }}</text>
           <text class="panel-close" @click="closeAnalyze">✕</text>
         </view>
         <scroll-view class="panel-body" scroll-y>
-          <view class="panel-content">{{ analyzeItem.content }}</view>
+          <!-- 图片预览 -->
+          <view v-if="analyzeItem.isImage && analyzeItem.imageInfo" class="panel-image-preview">
+            <image
+              class="panel-preview-img"
+              :src="analyzeItem.imageInfo.path"
+              mode="widthFix"
+            />
+            <view class="panel-image-meta">
+              <text v-if="analyzeItem.imageInfo.width && analyzeItem.imageInfo.height">
+                {{ analyzeItem.imageInfo.width }} × {{ analyzeItem.imageInfo.height }}
+              </text>
+              <text v-if="analyzeItem.imageInfo.size">
+                · {{ formatFileSize(analyzeItem.imageInfo.size) }}
+              </text>
+            </view>
+          </view>
+          <!-- 文本内容 -->
+          <view v-else class="panel-content">{{ analyzeItem.content }}</view>
         </scroll-view>
         <view class="panel-recognize">
-          <text>识别类型：{{ analyzeItem.typeLabel || '未知文本' }}</text>
+          <text>识别类型：{{ analyzeItem.label || '未知文本' }}</text>
         </view>
         <view class="panel-actions">
           <view class="panel-btn ignore" @click="closeAnalyze">不存</view>
           <view class="panel-btn local" @click="saveLocal">仅保存到本地</view>
-          <view class="panel-btn ai" @click="saveWithAI">存入并AI分析</view>
+          <view v-if="!analyzeItem.isImage" class="panel-btn ai" @click="saveWithAI">存入并AI分析</view>
         </view>
       </view>
     </view>
@@ -223,12 +269,21 @@
           <text class="panel-close" @click="closeDetail">✕</text>
         </view>
         <scroll-view class="detail-body" scroll-y>
+          <!-- 图片预览 -->
+          <view v-if="detailItem.mediaType === 'image'" class="detail-image-wrap">
+            <image
+              class="detail-image"
+              :src="detailItem.content"
+              mode="widthFix"
+              @error="onDetailImageError"
+            />
+          </view>
           <!-- 类型选择 -->
           <view class="detail-field">
             <text class="detail-label">类型</text>
             <scroll-view class="type-selector" scroll-x>
               <view
-                v-for="opt in typeOptions"
+                v-for="opt in detailTypeOptions"
                 :key="opt.value"
                 class="type-option"
                 :class="{ active: detailItem.rawType === opt.value }"
@@ -275,7 +330,7 @@
           </view>
 
           <!-- 具体内容 -->
-          <view class="detail-field">
+          <view v-if="detailItem.mediaType !== 'image'" class="detail-field">
             <text class="detail-label">具体内容</text>
             <textarea
               class="detail-textarea"
@@ -463,6 +518,10 @@ export default {
   transform: translateY(0);
   opacity: 1;
 }
+.notify-bar.image {
+  background: #FFF3E0;
+  border-bottom: 1rpx solid #FFE0B2;
+}
 .notify-icon {
   font-size: 28rpx;
   margin-right: 12rpx;
@@ -522,6 +581,12 @@ export default {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+}
+.card-image {
+  width: 100%;
+  border-radius: 12rpx;
+  background: #F0F0F0;
+  margin-top: 4rpx;
 }
 .card-footer {
   margin-top: 12rpx;
@@ -699,6 +764,21 @@ export default {
   white-space: pre-wrap;
   word-break: break-all;
 }
+.panel-image-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.panel-preview-img {
+  width: 100%;
+  border-radius: 12rpx;
+  background: #F0F0F0;
+}
+.panel-image-meta {
+  margin-top: 16rpx;
+  font-size: 24rpx;
+  color: #999;
+}
 .panel-recognize {
   display: flex;
   align-items: center;
@@ -748,6 +828,16 @@ export default {
   flex: 1;
   padding: 24rpx;
   max-height: 60vh;
+}
+.detail-image-wrap {
+  margin-bottom: 28rpx;
+  border-radius: 12rpx;
+  overflow: hidden;
+  background: #F0F0F0;
+}
+.detail-image {
+  width: 100%;
+  display: block;
 }
 .detail-field {
   margin-bottom: 28rpx;
