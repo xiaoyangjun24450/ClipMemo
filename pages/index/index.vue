@@ -358,6 +358,8 @@ export default {
   background: #F5F5F5;
   display: flex;
   flex-direction: column;
+  /* 为底部固定 tab-bar 留出空间 */
+  padding-bottom: calc(88rpx + env(safe-area-inset-bottom, 0px));
 }
 
 /* ========== 搜索栏 ========== */
@@ -874,6 +876,11 @@ export default {
 
 /* ========== 底部导航栏 ========== */
 .tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
   display: flex;
   justify-content: space-around;
   align-items: center;
