@@ -452,6 +452,9 @@ export default {
 }
 /* ========== 通知条 ========== */
 .notify-bar {
+  position: sticky;
+  top: 96rpx;
+  z-index: 99;
   display: flex;
   align-items: center;
   padding: 16rpx 24rpx;
