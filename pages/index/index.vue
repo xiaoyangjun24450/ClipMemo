@@ -326,6 +326,21 @@
       </view>
     </view>
 
+    <!-- 删除内容确认弹窗 -->
+    <view v-if="showDeleteConfirm" class="overlay" @click="cancelDeleteConfirm">
+      <view class="type-dialog" @click.stop>
+        <text class="dialog-title">确认删除</text>
+        <text class="dialog-desc">确定要删除这条内容吗？</text>
+        <view v-if="pendingDeleteItem" class="delete-preview">
+          {{ formatPreview(pendingDeleteItem.content) }}
+        </view>
+        <view class="dialog-actions">
+          <view class="dialog-btn cancel" @click="cancelDeleteConfirm">取消</view>
+          <view class="dialog-btn confirm danger" @click="confirmDeleteItem">确定删除</view>
+        </view>
+      </view>
+    </view>
+
     <!-- 底部导航栏 -->
     <view class="tab-bar">
       <view class="tab-item" :class="{ active: activeTab === 'home' }" @click="switchTab('home')">
@@ -875,6 +890,20 @@ export default {
   line-height: 1.6;
   margin-bottom: 28rpx;
   text-align: center;
+}
+.delete-preview {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 26rpx;
+  color: #888;
+  line-height: 1.6;
+  padding: 20rpx;
+  background: #F5F5F5;
+  border-radius: 12rpx;
+  margin-bottom: 28rpx;
+  text-align: left;
 }
 
 /* ========== 底部导航栏 ========== */

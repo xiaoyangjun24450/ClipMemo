@@ -41,6 +41,9 @@ export const listMixin = {
       pendingDeleteTypeVal: '',
       pendingDeleteTypeLabel: '',
       pendingDeleteTypeAffectedCount: 0,
+      // 删除内容确认
+      showDeleteConfirm: false,
+      pendingDeleteItem: null,
       // 分层搜索结果
       dataSourceResults: [],   // 数据来源匹配结果
       contentResults: [],      // 内容/关键词/描述匹配结果
@@ -382,9 +385,22 @@ export const listMixin = {
     },
 
     deleteItem(item) {
-      storage.deleteClip(item.id)
+      this.pendingDeleteItem = item
+      this.showDeleteConfirm = true
+    },
+
+    confirmDeleteItem() {
+      if (!this.pendingDeleteItem) return
+      storage.deleteClip(this.pendingDeleteItem.id)
+      this.showDeleteConfirm = false
+      this.pendingDeleteItem = null
       this.loadList()
       uni.showToast({ title: '已删除', icon: 'none', duration: 1500 })
+    },
+
+    cancelDeleteConfirm() {
+      this.showDeleteConfirm = false
+      this.pendingDeleteItem = null
     },
 
     // ==================== 详情弹窗 ====================
